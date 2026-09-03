@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 import threading
+import time
 from typing import Any
 
 import requests
@@ -43,7 +44,9 @@ async def send_event_to_telegram(event: dict[str, Any]) -> None:
         )
         await bot.send_message(ALLOWED_CHAT_ID, caption, reply_markup=keyboard)
     elif event_type in {"card", "enroll"}:
+        started = time.monotonic()
         photo = await asyncio.to_thread(esp_request, "GET", "/api/photo")
+        logging.info("Fotografie ESP32: HTTP %s in %.2fs", photo.status_code, time.monotonic() - started)
         if photo.ok:
             await bot.send_photo(ALLOWED_CHAT_ID, photo=photo.content, caption=caption)
         else:

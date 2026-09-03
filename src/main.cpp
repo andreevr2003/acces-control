@@ -122,9 +122,11 @@ bool initCamera() {
   config.pin_reset = RESET_GPIO_NUM;
   config.xclk_freq_hz = 20000000;
   config.pixel_format = PIXFORMAT_JPEG;
-  config.frame_size = psramFound() ? FRAMESIZE_SVGA : FRAMESIZE_VGA;
-  config.jpeg_quality = psramFound() ? 12 : 15;
-  config.fb_count = psramFound() ? 2 : 1;
+  // VGA pastreaza suficienta claritate pentru identificare si reduce
+  // semnificativ timpul de transfer catre Raspberry Pi si Telegram.
+  config.frame_size = FRAMESIZE_VGA;
+  config.jpeg_quality = 15;
+  config.fb_count = 1;
   return esp_camera_init(&config) == ESP_OK;
 }
 
