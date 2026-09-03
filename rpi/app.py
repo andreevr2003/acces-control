@@ -43,7 +43,7 @@ async def send_event_to_telegram(event: dict[str, Any]) -> None:
         )
         await bot.send_message(ALLOWED_CHAT_ID, caption, reply_markup=keyboard)
     elif event_type in {"card", "enroll"}:
-        photo = esp_request("GET", "/api/photo")
+        photo = await asyncio.to_thread(esp_request, "GET", "/api/photo")
         if photo.ok:
             await bot.send_photo(ALLOWED_CHAT_ID, photo=photo.content, caption=caption)
         else:
@@ -89,7 +89,15 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
     await query.answer()
     command = query.data
-    response = esp_request("POST", "/api/command", json={"command": command})
+    try:
+        response = await asyncio.to_thread(
+            esp_request, "POST", "/api/command", json={"command": command}
+        )
+    except requests.RequestException:
+        await query.edit_message_text(
+            "ESP32 nu este accesibil momentan. Verifica alimentarea si Wi-Fi."
+        )
+        return
     if response.ok:
         await query.edit_message_text(f"Comanda trimisa: {command}")
     else:

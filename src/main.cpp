@@ -60,6 +60,9 @@ unsigned long lastNfcCheck = 0;
 const unsigned long NFC_CHECK_INTERVAL = 300;
 unsigned long lastButtonPress = 0;
 const unsigned long BUTTON_COOLDOWN_MS = 8000;
+bool buttonWasPressed = false;
+unsigned long lastWifiReconnect = 0;
+const unsigned long WIFI_RECONNECT_INTERVAL_MS = 10000;
 
 void blinkLed(int times, int onMs, int offMs = 200) {
   for (int i = 0; i < times; i++) {
@@ -237,17 +240,28 @@ void loop() {
   server.handleClient();
   unsigned long now = millis();
 
+  if (WiFi.status() != WL_CONNECTED &&
+      now - lastWifiReconnect >= WIFI_RECONNECT_INTERVAL_MS) {
+    lastWifiReconnect = now;
+    Serial.println("Wi-Fi deconectat; incerc reconectarea.");
+    WiFi.disconnect();
+    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  }
+
   if (mode == MODE_ENROLL && now - enrollStartTime > ENROLL_WINDOW_MS) {
     mode = MODE_NORMAL;
     blinkLed(1, 600);
     sendEvent("enroll_timeout", "", "timeout", "Inregistrarea a expirat.");
   }
 
-  if (digitalRead(BUTTON_PIN) == LOW &&
+  bool buttonPressed = digitalRead(BUTTON_PIN) == LOW;
+  if (buttonPressed && !buttonWasPressed &&
       now - lastButtonPress > BUTTON_COOLDOWN_MS) {
     lastButtonPress = now;
+    Serial.println("Buton apel detectat.");
     sendEvent("button", "", "request", "Cineva a apasat butonul de apel.");
   }
+  buttonWasPressed = buttonPressed;
 
   if (now - lastNfcCheck < NFC_CHECK_INTERVAL) return;
   lastNfcCheck = now;
