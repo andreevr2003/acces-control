@@ -173,6 +173,15 @@ void sendEvent(const String& type, const String& uid, const String& status,
     memcpy(payload + prefix.length(), frame->buf, frame->len);
     memcpy(payload + prefix.length() + frame->len, suffix.c_str(), suffix.length());
     code = http.POST(payload, totalLength);
+    for (int attempt = 1; code <= 0 && attempt <= 2; attempt++) {
+      http.end();
+      delay(300);
+      Serial.printf("Retry HTTP fotografie %d/2...\n", attempt);
+      http.begin(RPI_EVENTS_URL);
+      http.addHeader("X-Access-Key", API_KEY);
+      http.addHeader("Content-Type", "multipart/form-data; boundary=" + boundary);
+      code = http.POST(payload, totalLength);
+    }
     Serial.printf("Eveniment multipart trimis: %d, payload=%u bytes\n",
                   code, (unsigned int)totalLength);
     free(payload);
