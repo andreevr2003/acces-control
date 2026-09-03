@@ -52,6 +52,14 @@ async def send_event_to_telegram(event: dict[str, Any]) -> None:
             await bot.send_message(ALLOWED_CHAT_ID, caption, reply_markup=keyboard)
     elif event_type in {"card", "enroll"}:
         photo = event.get("photo")
+        if not photo:
+            logging.warning("Evenimentul %s nu contine fotografie; cer fallback de la ESP32.", event_type)
+            try:
+                fallback = await asyncio.to_thread(esp_request, "GET", "/api/photo")
+                if fallback.ok:
+                    photo = fallback.content
+            except requests.RequestException as error:
+                logging.error("Fallback fotografie ESP32 esuat: %s", error)
         if photo:
             await bot.send_photo(ALLOWED_CHAT_ID, photo=photo, caption=caption)
         else:

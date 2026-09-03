@@ -138,6 +138,9 @@ void sendEvent(const String& type, const String& uid, const String& status,
   if (frame) {
     Serial.printf("Fotografie capturata imediat: %u bytes, %lu ms\n",
                   (unsigned int)frame->len, millis() - captureStarted);
+  } else if (includePhoto) {
+    Serial.printf("Fotografia nu a putut fi capturata la evenimentul %s.\n",
+                  type.c_str());
   }
   HTTPClient http;
   http.begin(RPI_EVENTS_URL);
@@ -170,6 +173,8 @@ void sendEvent(const String& type, const String& uid, const String& status,
     memcpy(payload + prefix.length(), frame->buf, frame->len);
     memcpy(payload + prefix.length() + frame->len, suffix.c_str(), suffix.length());
     code = http.POST(payload, totalLength);
+    Serial.printf("Eveniment multipart trimis: %d, payload=%u bytes\n",
+                  code, (unsigned int)totalLength);
     free(payload);
     esp_camera_fb_return(frame);
   } else {
