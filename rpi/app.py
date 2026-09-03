@@ -113,9 +113,19 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         )
         return
     if response.ok:
-        await query.edit_message_text(f"Comanda trimisa: {command}")
+        confirmation = f"Comanda trimisa: {command}"
+        if query.message and query.message.photo:
+            await query.edit_message_caption(caption=confirmation)
+        else:
+            await query.edit_message_text(confirmation)
     else:
-        await query.edit_message_text(f"ESP32 nu a acceptat comanda: HTTP {response.status_code}")
+        error_message = (
+            f"ESP32 nu a acceptat comanda: HTTP {response.status_code}"
+        )
+        if query.message and query.message.photo:
+            await query.edit_message_caption(caption=error_message)
+        else:
+            await query.edit_message_text(error_message)
 
 
 def run_flask() -> None:
