@@ -40,6 +40,7 @@ async def send_event_to_telegram(event: dict[str, Any]) -> None:
 
     bot = telegram_app.bot
     if event_type == "button":
+        telegram_started = time.monotonic()
         keyboard = InlineKeyboardMarkup(
             [[InlineKeyboardButton("Deschide usa", callback_data="open_door")]]
         )
@@ -50,6 +51,7 @@ async def send_event_to_telegram(event: dict[str, Any]) -> None:
             )
         else:
             await bot.send_message(ALLOWED_CHAT_ID, caption, reply_markup=keyboard)
+        logging.info("Notificare buton Telegram trimisa in %.2fs", time.monotonic() - telegram_started)
     elif event_type in {"card", "enroll"}:
         photo = event.get("photo")
         if not photo:

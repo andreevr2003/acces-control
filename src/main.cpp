@@ -61,6 +61,9 @@ const unsigned long NFC_CHECK_INTERVAL = 300;
 unsigned long lastButtonPress = 0;
 const unsigned long BUTTON_COOLDOWN_MS = 8000;
 bool buttonWasPressed = false;
+bool buttonStablePressed = false;
+unsigned long buttonChangedAt = 0;
+const unsigned long BUTTON_DEBOUNCE_MS = 80;
 unsigned long lastWifiReconnect = 0;
 const unsigned long WIFI_RECONNECT_INTERVAL_MS = 10000;
 
@@ -144,7 +147,10 @@ void sendEvent(const String& type, const String& uid, const String& status,
   }
   HTTPClient http;
   http.begin(RPI_EVENTS_URL);
+  http.setConnectTimeout(1000);
+  http.setTimeout(3000);
   http.addHeader("X-Access-Key", API_KEY);
+  unsigned long requestStarted = millis();
   int code;
   if (frame) {
     String boundary = "----Esp32AccessBoundary";
@@ -175,7 +181,7 @@ void sendEvent(const String& type, const String& uid, const String& status,
     code = http.POST(payload, totalLength);
     for (int attempt = 1; code <= 0 && attempt <= 2; attempt++) {
       http.end();
-      delay(300);
+      delay(100);
       Serial.printf("Retry HTTP fotografie %d/2...\n", attempt);
       http.begin(RPI_EVENTS_URL);
       http.addHeader("X-Access-Key", API_KEY);
@@ -184,6 +190,7 @@ void sendEvent(const String& type, const String& uid, const String& status,
     }
     Serial.printf("Eveniment multipart trimis: %d, payload=%u bytes\n",
                   code, (unsigned int)totalLength);
+    Serial.printf("Timp POST fotografie: %lu ms\n", millis() - requestStarted);
     free(payload);
     esp_camera_fb_return(frame);
   } else {
@@ -309,13 +316,22 @@ void loop() {
   }
 
   bool buttonPressed = digitalRead(BUTTON_PIN) == LOW;
-  if (buttonPressed && !buttonWasPressed &&
+  if (buttonPressed != buttonWasPressed) {
+    buttonChangedAt = now;
+    buttonWasPressed = buttonPressed;
+  }
+  if (buttonPressed && !buttonStablePressed &&
+      now - buttonChangedAt >= BUTTON_DEBOUNCE_MS &&
       now - lastButtonPress > BUTTON_COOLDOWN_MS) {
     lastButtonPress = now;
+    buttonStablePressed = true;
     Serial.println("Buton apel detectat.");
     sendEvent("button", "", "request", "Cineva a apasat butonul de apel.", true);
   }
-  buttonWasPressed = buttonPressed;
+  if (!buttonPressed && buttonStablePressed &&
+      now - buttonChangedAt >= BUTTON_DEBOUNCE_MS) {
+    buttonStablePressed = false;
+  }
 
   if (now - lastNfcCheck < NFC_CHECK_INTERVAL) return;
   lastNfcCheck = now;
