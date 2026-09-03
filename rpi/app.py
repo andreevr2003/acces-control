@@ -31,6 +31,7 @@ def esp_request(method: str, path: str, **kwargs: Any) -> requests.Response:
 
 
 async def send_event_to_telegram(event: dict[str, Any]) -> None:
+    started = time.monotonic()
     event_type = event.get("type", "event")
     uid = event.get("uid", "")
     status = event.get("status", "")
@@ -50,15 +51,15 @@ async def send_event_to_telegram(event: dict[str, Any]) -> None:
         else:
             await bot.send_message(ALLOWED_CHAT_ID, caption, reply_markup=keyboard)
     elif event_type in {"card", "enroll"}:
-        started = time.monotonic()
         photo = event.get("photo")
         if photo:
             await bot.send_photo(ALLOWED_CHAT_ID, photo=photo, caption=caption)
         else:
             await bot.send_message(ALLOWED_CHAT_ID, caption + "\nPoza indisponibila.")
-        logging.info("Fotografie eveniment procesata in %.2fs", time.monotonic() - started)
+        logging.info("Fotografie eveniment trimisa in %.2fs", time.monotonic() - started)
     else:
         await bot.send_message(ALLOWED_CHAT_ID, caption)
+    logging.info("Eveniment %s finalizat in %.2fs", event_type, time.monotonic() - started)
 
 
 @app.post("/event")

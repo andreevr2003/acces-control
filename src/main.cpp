@@ -122,10 +122,9 @@ bool initCamera() {
   config.pin_reset = RESET_GPIO_NUM;
   config.xclk_freq_hz = 20000000;
   config.pixel_format = PIXFORMAT_JPEG;
-  // VGA pastreaza suficienta claritate pentru identificare si reduce
-  // semnificativ timpul de transfer catre Raspberry Pi si Telegram.
-  config.frame_size = FRAMESIZE_VGA;
-  config.jpeg_quality = 15;
+  // QVGA minimizeaza timpul de capturare si transfer pentru notificari rapide.
+  config.frame_size = FRAMESIZE_QVGA;
+  config.jpeg_quality = 18;
   config.fb_count = 1;
   return esp_camera_init(&config) == ESP_OK;
 }
@@ -134,7 +133,12 @@ void sendEvent(const String& type, const String& uid, const String& status,
                const String& message, bool includePhoto = false) {
   if (WiFi.status() != WL_CONNECTED) return;
 
+  unsigned long captureStarted = millis();
   camera_fb_t* frame = includePhoto ? esp_camera_fb_get() : nullptr;
+  if (frame) {
+    Serial.printf("Fotografie capturata imediat: %u bytes, %lu ms\n",
+                  (unsigned int)frame->len, millis() - captureStarted);
+  }
   HTTPClient http;
   http.begin(RPI_EVENTS_URL);
   http.addHeader("X-Access-Key", API_KEY);
