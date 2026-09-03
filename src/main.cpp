@@ -138,7 +138,12 @@ void sendEvent(const String& type, const String& uid, const String& status,
                 message + "\",\"esp_url\":\"http://" +
                 WiFi.localIP().toString() + "\"}";
   int code = http.POST(body);
-  Serial.printf("Eveniment RPi HTTP: %d\n", code);
+  if (code <= 0) {
+    Serial.printf("Eroare HTTP RPi: %s (%d), endpoint=%s\n",
+                  http.errorToString(code).c_str(), code, RPI_EVENTS_URL);
+  } else {
+    Serial.printf("Eveniment RPi HTTP: %d\n", code);
+  }
   http.end();
 }
 
@@ -252,6 +257,8 @@ void loop() {
   if (!nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLength, 150)) return;
 
   String uidStr = uidToString(uid, uidLength);
+  Serial.print("Card NFC detectat: ");
+  Serial.println(uidStr);
   if (mode == MODE_ENROLL) {
     bool saved = saveNewUid(uidStr);
     mode = MODE_NORMAL;
