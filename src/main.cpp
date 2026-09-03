@@ -175,14 +175,16 @@ void handleCommand() {
     return;
   }
   String command = server.arg("plain");
-  if (command.indexOf("\"command\":\"enroll\"") >= 0) {
+  Serial.print("Comanda RPi primita: ");
+  Serial.println(command);
+  if (command.indexOf("enroll") >= 0) {
     mode = MODE_ENROLL;
     enrollStartTime = millis();
     blinkLed(1, 300);
     server.send(200, "application/json", "{\"ok\":true,\"command\":\"enroll\"}");
     return;
   }
-  if (command.indexOf("\"command\":\"open_door\"") >= 0) {
+  if (command.indexOf("open_door") >= 0) {
     digitalWrite(RELAY_PIN, HIGH);
     delay(3000);
     digitalWrite(RELAY_PIN, LOW);
