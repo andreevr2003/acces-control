@@ -42,15 +42,21 @@ async def send_event_to_telegram(event: dict[str, Any]) -> None:
         keyboard = InlineKeyboardMarkup(
             [[InlineKeyboardButton("Deschide usa", callback_data="open_door")]]
         )
-        await bot.send_message(ALLOWED_CHAT_ID, caption, reply_markup=keyboard)
+        photo = event.get("photo")
+        if photo:
+            await bot.send_photo(
+                ALLOWED_CHAT_ID, photo=photo, caption=caption, reply_markup=keyboard
+            )
+        else:
+            await bot.send_message(ALLOWED_CHAT_ID, caption, reply_markup=keyboard)
     elif event_type in {"card", "enroll"}:
         started = time.monotonic()
-        photo = await asyncio.to_thread(esp_request, "GET", "/api/photo")
-        logging.info("Fotografie ESP32: HTTP %s in %.2fs", photo.status_code, time.monotonic() - started)
-        if photo.ok:
-            await bot.send_photo(ALLOWED_CHAT_ID, photo=photo.content, caption=caption)
+        photo = event.get("photo")
+        if photo:
+            await bot.send_photo(ALLOWED_CHAT_ID, photo=photo, caption=caption)
         else:
             await bot.send_message(ALLOWED_CHAT_ID, caption + "\nPoza indisponibila.")
+        logging.info("Fotografie eveniment procesata in %.2fs", time.monotonic() - started)
     else:
         await bot.send_message(ALLOWED_CHAT_ID, caption)
 
@@ -59,7 +65,12 @@ async def send_event_to_telegram(event: dict[str, Any]) -> None:
 def event() -> tuple[Any, int]:
     if request.headers.get("X-Access-Key") != ACCESS_KEY:
         return jsonify(error="unauthorized"), 401
-    payload = request.get_json(silent=False)
+    payload = request.form.to_dict()
+    uploaded_photo = request.files.get("photo")
+    if uploaded_photo:
+        payload["photo"] = uploaded_photo.read()
+    elif request.is_json:
+        payload = request.get_json(silent=False)
     if not isinstance(payload, dict):
         return jsonify(error="invalid event"), 400
     future = asyncio.run_coroutine_threadsafe(

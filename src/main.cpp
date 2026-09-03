@@ -131,18 +131,50 @@ bool initCamera() {
 }
 
 void sendEvent(const String& type, const String& uid, const String& status,
-               const String& message) {
+               const String& message, bool includePhoto = false) {
   if (WiFi.status() != WL_CONNECTED) return;
 
+  camera_fb_t* frame = includePhoto ? esp_camera_fb_get() : nullptr;
   HTTPClient http;
   http.begin(RPI_EVENTS_URL);
-  http.addHeader("Content-Type", "application/json");
   http.addHeader("X-Access-Key", API_KEY);
-  String body = "{\"type\":\"" + type + "\",\"uid\":\"" + uid +
-                "\",\"status\":\"" + status + "\",\"message\":\"" +
-                message + "\",\"esp_url\":\"http://" +
-                WiFi.localIP().toString() + "\"}";
-  int code = http.POST(body);
+  int code;
+  if (frame) {
+    String boundary = "----Esp32AccessBoundary";
+    String prefix = "--" + boundary + "\r\n";
+    prefix += "Content-Disposition: form-data; name=\"type\"\r\n\r\n" + type + "\r\n";
+    prefix += "--" + boundary + "\r\n";
+    prefix += "Content-Disposition: form-data; name=\"uid\"\r\n\r\n" + uid + "\r\n";
+    prefix += "--" + boundary + "\r\n";
+    prefix += "Content-Disposition: form-data; name=\"status\"\r\n\r\n" + status + "\r\n";
+    prefix += "--" + boundary + "\r\n";
+    prefix += "Content-Disposition: form-data; name=\"message\"\r\n\r\n" + message + "\r\n";
+    prefix += "--" + boundary + "\r\n";
+    prefix += "Content-Disposition: form-data; name=\"photo\"; filename=\"access.jpg\"\r\n";
+    prefix += "Content-Type: image/jpeg\r\n\r\n";
+    String suffix = "\r\n--" + boundary + "--\r\n";
+    size_t totalLength = prefix.length() + frame->len + suffix.length();
+    http.addHeader("Content-Type", "multipart/form-data; boundary=" + boundary);
+    uint8_t* payload = (uint8_t*)malloc(totalLength);
+    if (!payload) {
+      esp_camera_fb_return(frame);
+      Serial.println("Memorie insuficienta pentru fotografia evenimentului.");
+      http.end();
+      return;
+    }
+    memcpy(payload, prefix.c_str(), prefix.length());
+    memcpy(payload + prefix.length(), frame->buf, frame->len);
+    memcpy(payload + prefix.length() + frame->len, suffix.c_str(), suffix.length());
+    code = http.POST(payload, totalLength);
+    free(payload);
+    esp_camera_fb_return(frame);
+  } else {
+    http.addHeader("Content-Type", "application/json");
+    String body = "{\"type\":\"" + type + "\",\"uid\":\"" + uid +
+                  "\",\"status\":\"" + status + "\",\"message\":\"" +
+                  message + "\"}";
+    code = http.POST(body);
+  }
   if (code <= 0) {
     Serial.printf("Eroare HTTP RPi: %s (%d), endpoint=%s\n",
                   http.errorToString(code).c_str(), code, RPI_EVENTS_URL);
@@ -263,7 +295,7 @@ void loop() {
       now - lastButtonPress > BUTTON_COOLDOWN_MS) {
     lastButtonPress = now;
     Serial.println("Buton apel detectat.");
-    sendEvent("button", "", "request", "Cineva a apasat butonul de apel.");
+    sendEvent("button", "", "request", "Cineva a apasat butonul de apel.", true);
   }
   buttonWasPressed = buttonPressed;
 
@@ -282,11 +314,11 @@ void loop() {
     mode = MODE_NORMAL;
     blinkLed(2, 150, 150);
     sendEvent("enroll", uidStr, saved ? "saved" : "exists",
-              saved ? "Card salvat cu succes." : "Cardul exista deja.");
+              saved ? "Card salvat cu succes." : "Cardul exista deja.", true);
   } else {
     bool authorized = isAuthorized(uidStr);
     sendEvent("card", uidStr, authorized ? "authorized" : "unknown",
-              authorized ? "Card autorizat." : "Card necunoscut.");
+              authorized ? "Card autorizat." : "Card necunoscut.", true);
     if (authorized) {
       digitalWrite(RELAY_PIN, HIGH);
       delay(3000);
