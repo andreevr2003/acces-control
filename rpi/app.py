@@ -72,14 +72,16 @@ def probe_esp(ip: str) -> str | None:
 def discover_esp32() -> None:
     global esp_url
     try:
-        local_network = default_local_network()
-        networks = [local_network, IPv4Network("10.31.0.0/16")]
+        networks = [
+            IPv4Network("10.31.1.0/24"),
+            IPv4Network("10.31.2.0/24"),
+        ]
         candidates = {
             ip
             for network in networks
             for ip in network.hosts()
         }
-        logging.info("Scanez %d adrese pentru ESP32 (inclusiv 10.31.x.x)", len(candidates))
+        logging.info("Scanez %d adrese pentru ESP32 pe 10.31.1.x si 10.31.2.x", len(candidates))
         with ThreadPoolExecutor(max_workers=256) as executor:
             futures = [executor.submit(probe_esp, str(ip)) for ip in candidates]
             for future in as_completed(futures):
@@ -89,7 +91,7 @@ def discover_esp32() -> None:
                         esp_url = found
                     logging.info("ESP32 detectat automat la %s", found)
                     return
-        logging.warning("ESP32 nu a fost gasit pe reteaua locala sau 10.31.0.0/16")
+        logging.warning("ESP32 nu a fost gasit pe 10.31.1.x sau 10.31.2.x")
     except (OSError, ValueError) as error:
         logging.error("Nu pot determina reteaua locala pentru scanare: %s", error)
 
