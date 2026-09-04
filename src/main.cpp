@@ -357,10 +357,13 @@ void loop() {
               saved ? "Card salvat cu succes." : "Cardul exista deja.", true);
   } else {
     bool authorized = isAuthorized(uidStr);
+    if (authorized) {
+      // Deschide imediat; captura si reteaua nu trebuie sa intarzie releul.
+      digitalWrite(RELAY_PIN, HIGH);
+    }
     sendEvent("card", uidStr, authorized ? "authorized" : "unknown",
               authorized ? "Card autorizat." : "Card necunoscut.", true);
     if (authorized) {
-      digitalWrite(RELAY_PIN, HIGH);
       delay(3000);
       digitalWrite(RELAY_PIN, LOW);
     }
