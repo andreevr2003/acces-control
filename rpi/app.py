@@ -50,7 +50,11 @@ def default_local_network() -> IPv4Network:
 
 
 def probe_esp(ip: str) -> str | None:
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.settimeout(0.15)
     try:
+        if sock.connect_ex((ip, 80)) != 0:
+            return None
         response = requests.get(
             f"http://{ip}/api/status",
             headers={"X-Access-Key": ACCESS_KEY},
@@ -60,16 +64,24 @@ def probe_esp(ip: str) -> str | None:
             return f"http://{ip}"
     except requests.RequestException:
         return None
+    finally:
+        sock.close()
     return None
 
 
 def discover_esp32() -> None:
     global esp_url
     try:
-        network = default_local_network()
-        logging.info("Scanez ESP32 pe reteaua %s", network)
-        with ThreadPoolExecutor(max_workers=32) as executor:
-            futures = [executor.submit(probe_esp, str(ip)) for ip in network.hosts()]
+        local_network = default_local_network()
+        networks = [local_network, IPv4Network("10.31.0.0/16")]
+        candidates = {
+            ip
+            for network in networks
+            for ip in network.hosts()
+        }
+        logging.info("Scanez %d adrese pentru ESP32 (inclusiv 10.31.x.x)", len(candidates))
+        with ThreadPoolExecutor(max_workers=256) as executor:
+            futures = [executor.submit(probe_esp, str(ip)) for ip in candidates]
             for future in as_completed(futures):
                 found = future.result()
                 if found:
