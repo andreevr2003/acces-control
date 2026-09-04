@@ -89,7 +89,7 @@ def discover_esp32() -> None:
                         esp_url = found
                     logging.info("ESP32 detectat automat la %s", found)
                     return
-        logging.warning("ESP32 nu a fost gasit pe %s", network)
+        logging.warning("ESP32 nu a fost gasit pe reteaua locala sau 10.31.0.0/16")
     except (OSError, ValueError) as error:
         logging.error("Nu pot determina reteaua locala pentru scanare: %s", error)
 
@@ -178,6 +178,27 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         )
 
 
+async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not update.effective_chat or update.effective_chat.id != ALLOWED_CHAT_ID:
+        return
+    with esp_url_lock:
+        detected = esp_url
+    if not detected:
+        await update.message.reply_text(
+            "ESP32 nu a fost detectat. Verifica logurile containerului."
+        )
+        return
+    try:
+        response = await asyncio.to_thread(esp_request, "GET", "/api/status")
+        await update.message.reply_text(
+            f"ESP32 detectat la {detected}\nRaspuns API: HTTP {response.status_code}"
+        )
+    except requests.RequestException as error:
+        await update.message.reply_text(
+            f"ESP32 detectat la {detected}, dar nu raspunde: {error}"
+        )
+
+
 async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     if query.message and query.message.chat_id != ALLOWED_CHAT_ID:
@@ -189,9 +210,11 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             esp_request, "POST", "/api/command", json={"command": command}
         )
     except requests.RequestException:
-        await query.edit_message_text(
-            "ESP32 nu este accesibil momentan. Verifica alimentarea si Wi-Fi."
-        )
+        error_message = "ESP32 nu este accesibil momentan. Verifica alimentarea si Wi-Fi."
+        if query.message and query.message.photo:
+            await query.edit_message_caption(caption=error_message)
+        else:
+            await query.edit_message_text(error_message)
         return
     if response.ok:
         confirmation = f"Comanda trimisa: {command}"
@@ -215,6 +238,7 @@ def run_flask() -> None:
 
 telegram_app = Application.builder().token(BOT_TOKEN).build()
 telegram_app.add_handler(CommandHandler(["start", "menu"], start))
+telegram_app.add_handler(CommandHandler("status", status))
 telegram_app.add_handler(CallbackQueryHandler(callback))
 telegram_loop = asyncio.new_event_loop()
 
