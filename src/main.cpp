@@ -137,7 +137,13 @@ void sendEvent(const String& type, const String& uid, const String& status,
   if (WiFi.status() != WL_CONNECTED) return;
 
   unsigned long captureStarted = millis();
-  camera_fb_t* frame = includePhoto ? esp_camera_fb_get() : nullptr;
+  camera_fb_t* frame = nullptr;
+  if (includePhoto) {
+    // Arunca cadrul deja aflat in buffer, apoi cere un cadru nou dupa eveniment.
+    camera_fb_t* staleFrame = esp_camera_fb_get();
+    if (staleFrame) esp_camera_fb_return(staleFrame);
+    frame = esp_camera_fb_get();
+  }
   if (frame) {
     Serial.printf("Fotografie capturata imediat: %u bytes, %lu ms\n",
                   (unsigned int)frame->len, millis() - captureStarted);
