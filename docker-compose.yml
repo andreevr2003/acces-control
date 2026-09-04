@@ -4,10 +4,8 @@ services:
       context: ./rpi
     container_name: access-control
     restart: unless-stopped
-    ports:
-      - "8080:8080"
+    network_mode: host
     environment:
       BOT_TOKEN: "${BOT_TOKEN}"
       ALLOWED_CHAT_ID: "${ALLOWED_CHAT_ID}"
-      ESP_URL: "${ESP_URL}"
       ACCESS_KEY: "${ACCESS_KEY}"

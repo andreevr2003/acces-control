@@ -30,10 +30,12 @@ Setati variabilele:
 ```text
 BOT_TOKEN=tokenul_nou_al_botului
 ALLOWED_CHAT_ID=1407961040
-ESP_URL=http://IP-ul-ESP32
 ACCESS_KEY=aceeasi-cheie-ca-in-secrets.h
 ```
 
-Portul publicat este `8080:8080`. Botul raspunde la `/start` si `/menu`.
+Containerul foloseste reteaua hostului (`network_mode: host`) si cauta automat
+ESP32 pe subnetul interfetei implicite la fiecare 60 de secunde. ESP32 trebuie
+sa fie in acelasi subnet cu Raspberry Pi si sa raspunda la `/api/status`.
+Botul raspunde la `/start` si `/menu`.
 
 Nu comitati niciodata `.env`, `include/secrets.h` sau tokenul Telegram.

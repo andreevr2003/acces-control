@@ -1,8 +1,11 @@
 import asyncio
 import logging
 import os
+import socket
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from ipaddress import IPv4Network
 from typing import Any
 
 import requests
@@ -20,14 +23,69 @@ app = Flask(__name__)
 
 BOT_TOKEN = os.environ["BOT_TOKEN"]
 ALLOWED_CHAT_ID = int(os.environ["ALLOWED_CHAT_ID"])
-ESP_URL = os.environ["ESP_URL"].rstrip("/")
 ACCESS_KEY = os.environ["ACCESS_KEY"]
+ESP_SCAN_INTERVAL = 60
+esp_url = ""
+esp_url_lock = threading.Lock()
 
 
 def esp_request(method: str, path: str, **kwargs: Any) -> requests.Response:
     headers = kwargs.pop("headers", {})
     headers["X-Access-Key"] = ACCESS_KEY
-    return requests.request(method, ESP_URL + path, headers=headers, timeout=10, **kwargs)
+    with esp_url_lock:
+        target = esp_url
+    if not target:
+        raise requests.ConnectionError("ESP32 nu a fost detectat in reteaua locala")
+    return requests.request(method, target + path, headers=headers, timeout=3, **kwargs)
+
+
+def default_local_network() -> IPv4Network:
+    probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        probe.connect(("10.255.255.255", 1))
+        local_ip = probe.getsockname()[0]
+    finally:
+        probe.close()
+    return IPv4Network(f"{local_ip}/24", strict=False)
+
+
+def probe_esp(ip: str) -> str | None:
+    try:
+        response = requests.get(
+            f"http://{ip}/api/status",
+            headers={"X-Access-Key": ACCESS_KEY},
+            timeout=1,
+        )
+        if response.ok:
+            return f"http://{ip}"
+    except requests.RequestException:
+        return None
+    return None
+
+
+def discover_esp32() -> None:
+    global esp_url
+    try:
+        network = default_local_network()
+        logging.info("Scanez ESP32 pe reteaua %s", network)
+        with ThreadPoolExecutor(max_workers=32) as executor:
+            futures = [executor.submit(probe_esp, str(ip)) for ip in network.hosts()]
+            for future in as_completed(futures):
+                found = future.result()
+                if found:
+                    with esp_url_lock:
+                        esp_url = found
+                    logging.info("ESP32 detectat automat la %s", found)
+                    return
+        logging.warning("ESP32 nu a fost gasit pe %s", network)
+    except (OSError, ValueError) as error:
+        logging.error("Nu pot determina reteaua locala pentru scanare: %s", error)
+
+
+def discovery_loop() -> None:
+    while True:
+        discover_esp32()
+        time.sleep(ESP_SCAN_INTERVAL)
 
 
 async def send_event_to_telegram(event: dict[str, Any]) -> None:
@@ -155,5 +213,6 @@ def run_telegram() -> None:
 
 
 if __name__ == "__main__":
+    threading.Thread(target=discovery_loop, daemon=True).start()
     threading.Thread(target=run_flask, daemon=True).start()
     run_telegram()
