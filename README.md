@@ -35,7 +35,9 @@ ACCESS_KEY=aceeasi-cheie-ca-in-secrets.h
 
 Containerul foloseste reteaua hostului (`network_mode: host`) si cauta automat
 ESP32 pe subnetul interfetei implicite la fiecare 60 de secunde. ESP32 trebuie
-sa fie in acelasi subnet cu Raspberry Pi si sa raspunda la `/api/status`.
+sa fie in acelasi subnet cu Raspberry Pi si sa raspunda la `/api/status` cu
+identificatorul `access-control-esp32`; astfel nu este selectat alt dispozitiv
+HTTP.
 Botul raspunde la `/start` si `/menu`.
 
 Nu comitati niciodata `.env`, `include/secrets.h` sau tokenul Telegram.

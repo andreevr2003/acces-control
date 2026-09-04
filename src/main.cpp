@@ -263,7 +263,8 @@ void handleStatus() {
     return;
   }
   String response = "{\"wifi\":true,\"ip\":\"" + WiFi.localIP().toString() +
-                    "\",\"enroll\":" + (mode == MODE_ENROLL ? "true" : "false") + "}";
+                    "\",\"device\":\"access-control-esp32\",\"enroll\":" +
+                    (mode == MODE_ENROLL ? "true" : "false") + "}";
   server.send(200, "application/json", response);
 }
 

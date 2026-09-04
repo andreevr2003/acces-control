@@ -60,9 +60,9 @@ def probe_esp(ip: str) -> str | None:
             headers={"X-Access-Key": ACCESS_KEY},
             timeout=1,
         )
-        if response.ok:
+        if response.ok and response.json().get("device") == "access-control-esp32":
             return f"http://{ip}"
-    except requests.RequestException:
+    except (requests.RequestException, ValueError):
         return None
     finally:
         sock.close()
